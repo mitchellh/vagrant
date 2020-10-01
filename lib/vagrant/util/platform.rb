@@ -139,8 +139,13 @@ module Vagrant
           return @_windows_hyperv_enabled if defined?(@_windows_hyperv_enabled)
 
           @_windows_hyperv_enabled = -> {
-            ["Get-WindowsOptionalFeature", "Get-WindowsFeature"].each do |cmd_name|
-              ps_cmd = "$(#{cmd_name} -FeatureName Microsoft-Hyper-V-Hypervisor).State"
+            {:"Get-WindowsOptionalFeature" => ["-Online"], :"Get-WindowsFeature" => []}.each do |cmd_name, arguments|
+              parameters = arguments.join " "
+              if cmd_name == "Get-WindowsFeature"
+                ps_cmd = "if (Get-Command #{cmd_name} -ErrorAction SilentlyContinue){ $(#{cmd_name} -FeatureName Microsoft-Hyper-V-Hypervisor #{parameters}).State } else { 'Disabled' }"
+              else
+                ps_cmd = "$(#{cmd_name} -FeatureName Microsoft-Hyper-V-Hypervisor #{parameters}).State"
+              end
               begin
                 output = Vagrant::Util::PowerShell.execute_cmd(ps_cmd)
                 return true if output == "Enabled"
