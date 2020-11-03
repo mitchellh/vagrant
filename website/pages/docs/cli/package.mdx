@@ -21,7 +21,9 @@ and if the provider supports it.
 - `--base NAME` - Instead of packaging a VirtualBox machine that Vagrant
   manages, this will package a VirtualBox machine that VirtualBox manages.
   `NAME` should be the name or UUID of the machine from the VirtualBox GUI.
-  Currently this option is only available for VirtualBox.
+  Currently this option is only available for VirtualBox. 
+  ** In a multi-machine environment, the UUID is required.** This info can be gathered
+  in two different ways. `ls -l ~/VirtualBox\ VMs` or `vboxmanage list vms`.
 
 - `--output NAME` - The resulting package will be saved as `NAME`. By default,
   it will be saved as `package.box`.
