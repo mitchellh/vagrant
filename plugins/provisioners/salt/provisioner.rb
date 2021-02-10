@@ -44,16 +44,17 @@ module VagrantPlugins
       end
 
       def binaries_found
+        if @machine.config.vm.communicator == :winrm
+          which_cmd = "Get-Command"
+        else
+          which_cmd = "which"
+        end
+
         ## Determine States, ie: install vs configure
         desired_binaries = []
         if !@config.no_minion
-          if @machine.config.vm.communicator == :winrm
-            desired_binaries.push('C:\\salt\\salt-minion.bat')
-            desired_binaries.push('C:\\salt\\salt-call.bat')
-          else
-            desired_binaries.push('salt-minion')
-            desired_binaries.push('salt-call')
-          end
+          desired_binaries.push('salt-minion')
+          desired_binaries.push('salt-call')
         end
 
         if @config.install_master
@@ -77,7 +78,7 @@ module VagrantPlugins
         found = true
         for binary in desired_binaries
           @machine.env.ui.info "Checking if %s is installed" % binary
-          if !@machine.communicate.test("which %s" % binary)
+          if !@machine.communicate.test("%s %s" % [which_cmd, binary])
             @machine.env.ui.info "%s was not found." % binary
             found = false
           else
@@ -142,8 +143,12 @@ module VagrantPlugins
           options = "#{options} -k #{seed_dir}"
         end
 
-        if configure && !install && @machine.config.vm.communicator != :winrm
-          options = "%s -C" % options
+        if configure && !install
+          if @machine.config.vm.communicator == :winrm
+            options = "%s -ConfigureOnly" % options
+          else
+            options = "%s -C" % options
+          end
         end
 
         if @config.install_master && @machine.config.vm.communicator != :winrm
