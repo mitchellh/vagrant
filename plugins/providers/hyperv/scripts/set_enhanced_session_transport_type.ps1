@@ -25,6 +25,6 @@ try {
         Write-OutputMessage "This version of HyperV does not support EnhancedSessionTransportType, ignoring."
     }
 } catch {
-    Write-ErrorMessage "Failed to assign EnhancedSessionTransportType to ${Type}:${PSItem}"
+    Write-ErrorMessage "Failed to assign EnhancedSessionTransportType to ${Type}: ${PSItem}"
     exit 1
 }
