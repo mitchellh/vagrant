@@ -7,9 +7,14 @@ Param(
 
 Add-Type -AssemblyName System.DirectoryServices.AccountManagement
 
+$ctx_type = [System.DirectoryServices.AccountManagement.ContextType]::Machine
+
+if ($username -match '@') {
+    $ctx_type = [System.DirectoryServices.AccountManagement.ContextType]::Domain
+}
+
 $DSContext = New-Object System.DirectoryServices.AccountManagement.PrincipalContext(
-    [System.DirectoryServices.AccountManagement.ContextType]::Machine,
-    $env:COMPUTERNAME
+    $ctx_type
 )
 
 if ( $DSContext.ValidateCredentials( $username, $password ) ) {
