@@ -1870,6 +1870,8 @@ en:
         Please ensure both installation of Vagrant are the same. If you do not want
         update your Vagrant installations you can disable Windows access by unsetting
         the `VAGRANT_WSL_ACCESS_WINDOWS_USER` environment variable.
+        You can also use nested virtualization within WSL2 by setting
+        the `VAGRANT_WSL_NESTED_VIRTUALIZATION` environment variable.
 
           Windows Vagrant version: %{windows_version}
           Windows Subsystem for Linux Vagrant version: %{wsl_version}
@@ -1877,16 +1879,21 @@ en:
         Vagrant will not operate outside the Windows Subsystem for Linux unless explicitly
         instructed. Due to the inability to enforce expected Linux file ownership and
         permissions on the Windows system, Vagrant will not make modifications to prevent
-        unexpected errors. To learn more about this, and the options that are available,
+        unexpected errors. You can use nested virtualization within WSL2 by setting
+        the `VAGRANT_WSL_NESTED_VIRTUALIZATION` environment variable.
+        To learn more about this, and the options that are available,
         please refer to the Vagrant documentation:
 
           https://www.vagrantup.com/docs/other/wsl.html
       wsl_virtualbox_windows_access: |-
         Vagrant is unable to use the VirtualBox provider from the Windows Subsystem for
         Linux without access to the Windows environment. Enabling this access must be
-        done with caution and an understanding of the implications. For more information
-        on enabling Windows access and using VirtualBox from the Windows Subsystem for
-        Linux, please refer to the Vagrant documentation:
+        done with caution and an understanding of the implications.
+        You can use providers within WSL2 via nested virtualization by setting
+        the `VAGRANT_WSL_NESTED_VIRTUALIZATION` environment variable.
+        For more information on enabling Windows access and using VirtualBox from the
+        Windows Subsystem for Linux, please refer to the Vagrant documentation:
+          
 
           https://www.vagrantup.com/docs/other/wsl.html
       wsl_rootfs_not_found_error: |-
