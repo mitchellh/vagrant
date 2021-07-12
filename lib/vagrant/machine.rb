@@ -120,6 +120,8 @@ module Vagrant
       @state_mutex     = Mutex.new
       @triggers        = Vagrant::Plugin::V2::Trigger.new(@env, @config.trigger, self, @ui)
 
+      @__config_ssh = nil
+
       # Read the ID, which is usually in local storage
       @id = nil
 
@@ -268,9 +270,9 @@ module Vagrant
         raise Errors::CommunicatorNotFound, comm: requested.to_s if !klass
         @communicator = klass.new(self)
       end
-
       @communicator
     end
+
 
     # Returns a guest implementation for this machine. The guest implementation
     # knows how to do guest-OS specific tasks, such as configuring networks,
@@ -421,6 +423,19 @@ module Vagrant
       @id
     end
 
+    def ssh_config
+      if !@__config_ssh
+        requested  = @config.vm.communicator
+        requested ||= :ssh
+        @__config_ssh = @config.vm.get_communicator_config(requested, @config)
+
+        if @__config_ssh.nil?
+          @__config_ssh = @config.ssh
+        end
+      end
+      @__config_ssh
+    end
+
     # This returns the SSH info for accessing this machine. This SSH info
     # is queried from the underlying provider. This method returns `nil` if
     # the machine is not ready for SSH communication.
@@ -470,42 +485,42 @@ module Vagrant
 
       # We set overrides if they are set. These take precedence over
       # provider-returned data.
-      info[:host] = @config.ssh.host if @config.ssh.host
-      info[:port] = @config.ssh.port if @config.ssh.port
-      info[:keys_only] = @config.ssh.keys_only
-      info[:verify_host_key] = @config.ssh.verify_host_key
-      info[:compression] = @config.ssh.compression
-      info[:dsa_authentication] = @config.ssh.dsa_authentication
-      info[:username] = @config.ssh.username if @config.ssh.username
-      info[:password] = @config.ssh.password if @config.ssh.password
-      info[:remote_user] = @config.ssh.remote_user if @config.ssh.remote_user
-      info[:extra_args] = @config.ssh.extra_args if @config.ssh.extra_args
-      info[:config] = @config.ssh.config if @config.ssh.config
+      info[:host] = ssh_config().host if  ssh_config().host
+      info[:port] = ssh_config().port if  ssh_config().port
+      info[:keys_only] = ssh_config().keys_only
+      info[:verify_host_key] = ssh_config().verify_host_key
+      info[:compression] = ssh_config().compression
+      info[:dsa_authentication] = ssh_config().dsa_authentication
+      info[:username] = ssh_config().username if  ssh_config().username
+      info[:password] = ssh_config().password if  ssh_config().password
+      info[:remote_user] = ssh_config().remote_user if  ssh_config().remote_user
+      info[:extra_args] = ssh_config().extra_args if  ssh_config().extra_args
+      info[:config] = ssh_config().config if  ssh_config().config
 
       # We also set some fields that are purely controlled by Vagrant
-      info[:forward_agent] = @config.ssh.forward_agent
-      info[:forward_x11] = @config.ssh.forward_x11
-      info[:forward_env] = @config.ssh.forward_env
-      info[:connect_timeout] = @config.ssh.connect_timeout
+      info[:forward_agent] = ssh_config().forward_agent
+      info[:forward_x11] = ssh_config().forward_x11
+      info[:forward_env] = ssh_config().forward_env
+      info[:connect_timeout] = ssh_config().connect_timeout
 
-      info[:ssh_command] = @config.ssh.ssh_command if @config.ssh.ssh_command
+      info[:ssh_command] = ssh_config().ssh_command if  ssh_config().ssh_command
 
       # Add in provided proxy command config
-      info[:proxy_command] = @config.ssh.proxy_command if @config.ssh.proxy_command
+      info[:proxy_command] = ssh_config().proxy_command if  ssh_config().proxy_command
 
       # Set the private key path. If a specific private key is given in
       # the Vagrantfile we set that. Otherwise, we use the default (insecure)
       # private key, but only if the provider didn't give us one.
       if !info[:private_key_path] && !info[:password]
-        if @config.ssh.private_key_path
-          info[:private_key_path] = @config.ssh.private_key_path
+        if ssh_config().private_key_path
+          info[:private_key_path] = ssh_config().private_key_path
         elsif info[:keys_only]
           info[:private_key_path] = @env.default_private_key_path
         end
       end
 
       # If we have a private key in our data dir, then use that
-      if @data_dir && !@config.ssh.private_key_path
+      if @data_dir && !ssh_config().private_key_path
         data_private_key = @data_dir.join("private_key")
         if data_private_key.file?
           info[:private_key_path] = [data_private_key.to_s]

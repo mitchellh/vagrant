@@ -2091,6 +2091,8 @@ en:
           The host path of the shared folder is not supported from WSL. Host
           path of the shared folder must be located on a file system with
           DrvFs type. Host path: %{path}
+        communicator_not_found: |-
+          The '%{name}' communicator could not be found.
 
 #-------------------------------------------------------------------------------
 # Translations for guests

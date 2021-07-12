@@ -42,7 +42,6 @@ module VagrantPlugins
       attr_accessor :box_download_insecure
       attr_accessor :box_download_location_trusted
       attr_accessor :box_download_options
-      attr_accessor :communicator
       attr_accessor :graceful_halt_timeout
       attr_accessor :guest
       attr_accessor :hostname
@@ -80,7 +79,6 @@ module VagrantPlugins
         @box_version                   = UNSET_VALUE
         @allow_hosts_modification      = UNSET_VALUE
         @clone                         = UNSET_VALUE
-        @communicator                  = UNSET_VALUE
         @graceful_halt_timeout         = UNSET_VALUE
         @guest                         = UNSET_VALUE
         @hostname                      = UNSET_VALUE
@@ -100,6 +98,11 @@ module VagrantPlugins
         @__provider_order              = []
         @__provider_overrides          = {}
         @__synced_folders              = {}
+        @__compiled_communicator_configs         = {}
+        @__communicators               = {}
+        @__communicator                = UNSET_VALUE
+        @__last_communicator_created   = nil
+
       end
 
       # This was from V1, but we just kept it here as an alias for hostname
@@ -242,12 +245,37 @@ module VagrantPlugins
             new_folders[id].merge!(options)
           end
 
+          # Merge communicators
+          other_communicators = other.instance_variable_get(:@__communicators)
+          new_communicators = {}
+          @__communicators.each do |key, value|
+            new_communicators[key] = value.dup
+          end
+          other_communicators.each do |key, value|
+            new_communicators[key] ||= []
+            new_communicators[key] += value.dup
+          end
+
+          other_last_communicator_created = other.instance_variable_get(:@__last_communicator_created)
+          if other_last_communicator_created
+            result.instance_variable_set(:@__last_communicator_created, other_last_communicator_created)
+          else
+            result.instance_variable_set(:@__last_communicator_created, @__last_communicator_created)
+          end
+          if other.communicator_defined?
+            other_communicator = other.instance_variable_get(:@__communicator)
+            result.instance_variable_set(:@__communicator, other_communicator)
+          else
+            result.instance_variable_set(:@__communicator, @__communicator)
+          end
+
           result.instance_variable_set(:@__defined_vm_keys, new_defined_vm_keys)
           result.instance_variable_set(:@__defined_vms, new_defined_vms)
           result.instance_variable_set(:@__providers, new_providers)
           result.instance_variable_set(:@__provider_order, new_order)
           result.instance_variable_set(:@__provider_overrides, new_overrides)
           result.instance_variable_set(:@__synced_folders, new_folders)
+          result.instance_variable_set(:@__communicators, new_communicators)
         end
       end
 
@@ -507,6 +535,26 @@ module VagrantPlugins
         @cloud_init_configs << cloud_init_config
       end
 
+      # Select the communicator
+      def communicator=(type)
+        @__communicator = type.to_sym
+      end
+
+      #  Define communicator config options from Vagrantfile
+      def communicator(name=nil, &block)
+        if name.nil?
+          return get_communicator
+        end
+        name = name.to_sym
+        @__communicators[name] ||= []
+        @__last_communicator_created = name
+
+        if block_given?
+          @__communicators[name] << block if block_given?
+        end
+      end
+
+
       #-------------------------------------------------------------------
       # Internal methods, don't call these.
       #-------------------------------------------------------------------
@@ -537,7 +585,6 @@ module VagrantPlugins
         @box_extra_download_options = Vagrant::Util::MapCommandOptions.map_to_command_options(@box_download_options)
         @allow_hosts_modification = true if @allow_hosts_modification == UNSET_VALUE
         @clone = nil if @clone == UNSET_VALUE
-        @communicator = nil if @communicator == UNSET_VALUE
         @graceful_halt_timeout = 60 if @graceful_halt_timeout == UNSET_VALUE
         @guest = nil if @guest == UNSET_VALUE
         @hostname = nil if @hostname == UNSET_VALUE
@@ -562,9 +609,6 @@ module VagrantPlugins
         # Make sure the box URL is an array if it is set
         @box_url = Array(@box_url) if @box_url
 
-        # Set the communicator properly
-        @communicator = @communicator.to_sym if @communicator
-
         # Set the guest properly
         @guest = @guest.to_sym if @guest
 
@@ -573,7 +617,7 @@ module VagrantPlugins
         define(DEFAULT_VM_NAME) if defined_vm_keys.empty?
 
         # Make sure the SSH forwarding is added if it doesn't exist
-        if @communicator == :winrm
+        if communicator == :winrm
           if !@__networks["forwarded_port-winrm"]
             network :forwarded_port,
               guest: 5985,
@@ -653,6 +697,7 @@ module VagrantPlugins
 
         # Finalize all the provisioners
         @provisioners.each do |p|
+
           p.config.finalize! if !p.invalid?
           p.run = p.run.to_sym if p.run
         end
@@ -674,6 +719,46 @@ module VagrantPlugins
 
         if !current_dir_shared && !@__synced_folders["/vagrant"]
           synced_folder(".", "/vagrant")
+        end
+
+        # Compile all the provider configurations
+        @__communicators.each do |name, blocks|
+          # If we don't have any configuration blocks, then ignore it
+          next if blocks.empty?
+
+          # Find the configuration class for this communicator
+          config_class = Vagrant.plugin("2").manager.config[name]
+          config_class ||= Vagrant::Config::V2::DummyConfig
+
+          # Load it up
+          config = config_class.new
+          begin
+            blocks.each do |b|
+              new_config = config_class.new
+              b.call(new_config, Vagrant::Config::V2::DummyConfig.new)
+              config = config.merge(new_config)
+            end
+          rescue Exception => e
+            @logger.error("Vagrantfile load error: #{e.message}")
+            @logger.error(e.inspect)
+            @logger.error(e.message)
+            @logger.error(e.backtrace.join("\n"))
+
+            line = "(unknown)"
+            if e.backtrace && e.backtrace[0]
+              line = e.backtrace.first.slice(0, e.backtrace.first.rindex(':')).rpartition(':').last
+            end
+
+            raise Vagrant::Errors::VagrantfileLoadError,
+              path: "<communicator config: #{name}>",
+              line: line,
+              exception_class: e.class,
+              message: e.message
+          end
+
+          # Store it for retrieval later
+          @__compiled_communicator_configs[name.to_sym]   = config
+
         end
 
         # Flag that we finalized
@@ -721,6 +806,43 @@ module VagrantPlugins
       # This returns the list of synced folders
       def synced_folders
         @__synced_folders
+      end
+
+      def communicator_defined?
+        @__communicator != UNSET_VALUE and @__communicator
+      end
+
+      # This returns the communicator selected
+      def get_communicator
+        if !communicator_defined?
+          return @__last_communicator_created
+        end
+        return @__communicator
+      end
+
+      # This returns the compiled communicator-specific configuration for the
+      # given communicator.
+      #
+      # @param [Symbol] name Name of the communicator.
+      # @param [Symbol] config config to overide
+      def get_communicator_config(name, config=nil)
+        raise "Must finalize first." if !@__finalized
+
+        config_class = Vagrant.plugin("2").manager.config[name]
+        return nil if config_class.nil?
+
+        config_ssh = config_class.new
+
+        if config
+          config_ssh = config_ssh.merge(config.instance_variable_get('@keys')[name.to_sym])
+        end
+
+        if @__compiled_communicator_configs[name]
+          config_ssh = config_ssh.merge(@__compiled_communicator_configs[name])
+        end
+
+        config_ssh.finalize!
+        config_ssh
       end
 
       def validate(machine, ignore_provider=nil)
@@ -986,6 +1108,25 @@ module VagrantPlugins
             if provisioner_errors
               errors = Vagrant::Config::V2::Util.merge_errors(errors, provisioner_errors)
             end
+          end
+        end
+
+        #Validate communicator
+        if communicator_defined? and !Vagrant.plugin("2").manager.communicators.has_key?(communicator)
+          errors["vm"] << I18n.t("vagrant.config.vm.communicator_not_found",
+                                 name: communicator)
+        end
+        @__compiled_communicator_configs.each do |name, config|
+          if !Vagrant.plugin("2").manager.communicators.has_key?(name)
+            errors["vm"] << I18n.t("vagrant.config.vm.communicator_not_found",
+                                   name: name)
+            next
+          end
+
+          new_config = get_communicator_config(name, machine.config)
+          ssh_config_error = new_config.validate(machine)
+          if ssh_config_error
+            errors = Vagrant::Config::V2::Util.merge_errors(errors, ssh_config_error)
           end
         end
 

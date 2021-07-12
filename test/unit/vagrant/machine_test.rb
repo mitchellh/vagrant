@@ -708,6 +708,70 @@ describe Vagrant::Machine do
         expect(instance.ssh_info[:private_key_path]).to eq([File.expand_path("/foo", env.root_path)])
       end
 
+      [:host, :port, :username].each do |type|
+        it "should return the provider data if not configured into config vm in Vagrantfile " do
+          provider_ssh_info[type] = "foo"
+          instance.config.vm.communicator 'ssh' do |ssh|
+            ssh.send("#{type}=", nil)
+          end
+          instance.config.vm.finalize!
+          expect(instance.ssh_info[type]).to eq("foo")
+        end
+
+        it "should return the Vagrantfile value if provider data not given into config vm " do
+          provider_ssh_info[type] = nil
+          instance.config.vm.communicator 'ssh' do |ssh|
+            ssh.send("#{type}=", "bar")
+          end
+          instance.config.vm.finalize!
+          expect(instance.ssh_info[type]).to eq("bar")
+        end
+
+        it "should use the default if no override and no provider into config vm " do
+          provider_ssh_info[type] = nil
+          instance.config.vm.communicator 'ssh' do |ssh|
+            ssh.send("#{type}=", nil)
+          end
+          instance.config.ssh.default.send("#{type}=", "foo")
+          instance.config.vm.finalize!
+          expect(instance.ssh_info[type]).to eq("foo")
+        end
+
+        it "should use the override if set even with a provider into config vm " do
+          provider_ssh_info[type] = "baz"
+          instance.config.vm.communicator 'ssh' do |ssh|
+            ssh.send("#{type}=", "bar")
+          end
+          instance.config.ssh.default.send("#{type}=", "foo")
+          instance.config.vm.finalize!
+          expect(instance.ssh_info[type]).to eq("bar")
+        end
+      end
+
+      it "should set the configured forward agent settings into config vm " do
+        provider_ssh_info[:forward_agent] = true
+        instance.config.vm.communicator 'ssh' do |ssh|
+          ssh.forward_agent = false
+        end
+        instance.config.vm.finalize!
+        expect(instance.ssh_info[:forward_agent]).to eq(false)
+      end
+
+      it "should set the configured forward X11 settings into config vm " do
+        provider_ssh_info[:forward_x11] = true
+        instance.config.vm.communicator 'ssh' do |ssh|
+          ssh.forward_x11 = false
+        end
+        instance.config.vm.finalize!
+        expect(instance.ssh_info[:forward_x11]).to eq(false)
+      end
+
+      it "should return the provider private key if given" do
+        provider_ssh_info[:private_key_path] = "/foo"
+
+        expect(instance.ssh_info[:private_key_path]).to eq([File.expand_path("/foo", env.root_path)])
+      end
+
       it "should return the configured SSH key path if set" do
         provider_ssh_info[:private_key_path] = nil
         instance.config.ssh.private_key_path = "/bar"
@@ -872,7 +936,7 @@ describe Vagrant::Machine do
         end
         it "verify_host_key should be overridden" do
           instance.config.ssh.verify_host_key = true
-          expect(instance.ssh_info[:verify_host_key]).to be(true)
+          expect(instance.ssh_info[:verify_host_key]).to be(:accepts_new_or_local_tunnel)
         end
       end
     end

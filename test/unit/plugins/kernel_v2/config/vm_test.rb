@@ -1,6 +1,8 @@
 require File.expand_path("../../../../base", __FILE__)
 
 require Vagrant.source_root.join("plugins/kernel_v2/config/vm")
+require Vagrant.source_root.join("plugins/kernel_v2/config/ssh")
+
 
 describe VagrantPlugins::Kernel_V2::VMConfig do
   include_context "unit"
@@ -836,5 +838,178 @@ describe VagrantPlugins::Kernel_V2::VMConfig do
       expect(subject.usable_port_range).to eq(
         Range.new(2200, 2250))
     end
+  end
+
+  describe "#communicator and #get_communicator" do
+    it "#communicator is getter if name is nil" do
+      subject.communicator = "bar"
+      expect(subject.communicator).to eq(:bar)
+    end
+
+    it "#communicator return the last defined communicator" do
+      subject.communicator 'foo'
+      subject.communicator 'bar'
+      expect(subject.communicator).to eq(:bar)
+    end
+  end
+
+  describe "#communicator and #__communicators" do
+    it "we can create block with #communicator" do
+      subject.communicator 'foo'
+      subject.communicator 'bar'
+      subject.finalize!
+      expect(subject.instance_variable_get(:@__communicators)).to eq({:foo => [], :bar => []})
+    end
+  end
+
+  describe "#communicator and #get_communicator_config" do
+    let(:ssh_klass) { VagrantPlugins::Kernel_V2::SSHConfig }
+    let(:config) { double('config') }
+    before do
+      config.instance_variable_set(:@keys, {:ssh => ssh_klass.new })
+      allow(machine).to receive(:config).and_return(config)
+    end
+    it "compiles the configurations for a communicator" do
+      subject.communicator "ssh" do |ssh|
+        ssh.compression = false
+        ssh.password = "bar"
+      end
+
+      subject.communicator "ssh" do |ssh|
+        ssh.username = "foo"
+      end
+
+      subject.finalize!
+
+      config = subject.get_communicator_config(:ssh)
+      expect(config.username).to eq("foo")
+      expect(config.password).to eq("bar")
+      expect(config.compression).to be(false)
+    end
+
+    it "compiles the configurations for two communicator" do
+      subject.communicator "ssh" do |ssh|
+        ssh.compression = false
+        ssh.password = "bar"
+      end
+
+      subject.communicator "winssh" do |ssh|
+        ssh.username = "foo"
+        ssh.password = "foo"
+      end
+
+      subject.finalize!
+
+      config = subject.get_communicator_config(:ssh)
+      expect(config.password).to eq("bar")
+      expect(config.compression).to be(false)
+      config = subject.get_communicator_config(:winssh)
+      expect(config.username).to eq("foo")
+      expect(config.password).to eq("foo")
+    end
+
+    it "raises an exception if there is a problem loading" do
+      subject.communicator "ssh" do |ssh|
+        # Purposeful bad variable
+        ss.foo = "bar"
+      end
+
+      expect { subject.finalize! }.
+        to raise_error(Vagrant::Errors::VagrantfileLoadError)
+    end
+
+    it "ignores communicator entirely if communicator does not exist" do
+      subject.communicator "foo" do |ssh|
+      end
+
+      subject.finalize!
+      errors = subject.validate(machine, true)
+      expect(errors).to eq({"vm"=>["The 'foo' communicator could not be found."]})
+    end
+
+    it "ignores communicator entirely if flag is provided" do
+      subject.communicator "ssh" do |ssh|
+        ssh.nope = true
+      end
+
+      subject.communicator "ssh" do |ssh|
+        ssh.not_real = "foo"
+      end
+
+      subject.finalize!
+      errors = subject.validate(machine, true)
+      expect(errors).to eq({"SSH" => ["The following settings shouldn't exist: nope, not_real"], "vm"=>[]})
+    end
+
+    it "return nil if communicator name does not exist" do
+      subject.finalize!
+
+      config = subject.get_communicator_config(:foo)
+      expect(config).to eq(nil)
+    end
+
+    it "overide existing config" do
+      config_ssh = config.instance_variable_get(:@keys)[:ssh]
+      config_ssh.connect_timeout = 2
+      config_ssh.username = 'foo'
+      subject.communicator "ssh" do |ssh|
+        ssh.username = 'bar'
+      end
+
+      subject.finalize!
+      config_ssh = subject.get_communicator_config(:ssh, config)
+      expect(config_ssh.connect_timeout).to eq(2)
+      expect(config_ssh.username).to eq('bar')
+    end
+
+    describe "merging" do
+      it "prioritizes #__communicator, #__last_communicator_created and __communicators" do
+        subject.communicator "foo"
+        subject.communicator = "baz"
+
+        other = described_class.new
+        other.communicator "bar"
+
+        merged = subject.merge(other)
+
+        expect(merged.instance_variable_get(:@__communicators)).to eq({:foo => [], :bar => []})
+        expect(merged.instance_variable_get(:@__last_communicator_created)).to eq(:bar)
+        expect(merged.instance_variable_get(:@__communicator)).to eq(:baz)
+      end
+
+      it "prioritizes #__last_communicator_created" do
+        subject.communicator "foo"
+
+        other = described_class.new
+        other.communicator = "bar"
+
+        merged = subject.merge(other)
+
+        expect(merged.instance_variable_get(:@__communicators)).to eq({:foo => []})
+        expect(merged.instance_variable_get(:@__last_communicator_created)).to eq(:foo)
+        expect(merged.instance_variable_get(:@__communicator)).to eq(:bar)
+      end
+
+      it "overides config" do
+        subject.communicator "ssh" do |ssh|
+          ssh.compression = false
+          ssh.password = "bar"
+        end
+
+        subject.communicator "ssh" do |ssh|
+          ssh.username = "foo"
+          ssh.password = "foo"
+        end
+
+        subject.finalize!
+
+        config = subject.get_communicator_config(:ssh)
+        expect(config.compression).to be(false)
+        expect(config.username).to eq("foo")
+        expect(config.password).to eq("foo")
+      end
+
+    end
+
   end
 end
