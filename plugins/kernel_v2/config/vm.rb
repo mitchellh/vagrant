@@ -47,6 +47,7 @@ module VagrantPlugins
       attr_accessor :guest
       attr_accessor :hostname
       attr_accessor :post_up_message
+      attr_accessor :failed_up_message
       attr_accessor :usable_port_range
       attr_reader :provisioners
       attr_reader :disks
@@ -85,6 +86,7 @@ module VagrantPlugins
         @guest                         = UNSET_VALUE
         @hostname                      = UNSET_VALUE
         @post_up_message               = UNSET_VALUE
+        @failed_up_message             = UNSET_VALUE
         @provisioners                  = []
         @disks                         = []
         @cloud_init_configs            = []
@@ -543,6 +545,7 @@ module VagrantPlugins
         @hostname = nil if @hostname == UNSET_VALUE
         @hostname = @hostname.to_s if @hostname
         @post_up_message = "" if @post_up_message == UNSET_VALUE
+        @failed_up_message = "" if @failed_up_message == UNSET_VALUE
 
         if @usable_port_range == UNSET_VALUE
           @usable_port_range = (2200..2250)

@@ -373,6 +373,19 @@ describe VagrantPlugins::Kernel_V2::VMConfig do
     end
   end
 
+  describe "#failed_up_message" do
+    it "defaults to empty string" do
+      subject.finalize!
+      expect(subject.failed_up_message).to eq("")
+    end
+
+    it "can be set" do
+      subject.failed_up_message = "bar"
+      subject.finalize!
+      expect(subject.failed_up_message).to eq("bar")
+    end
+  end
+
   describe "#provider and #__providers" do
     it "returns the providers in order" do
       subject.provider "foo"
