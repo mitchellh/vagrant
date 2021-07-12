@@ -131,6 +131,13 @@ module VagrantPlugins
         execute(:stop_vm, VmId: vm_id)
       end
 
+      # Halt the VM
+      #
+      # @return [nil]
+      def halt
+        execute(:stop_vm, VmId: vm_id, Force: true)
+      end
+
       # Suspend the VM
       #
       # @return [nil]

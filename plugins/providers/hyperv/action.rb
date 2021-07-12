@@ -39,7 +39,7 @@ module VagrantPlugins
 
               b2.use ConfigValidate
               b2.use ProvisionerCleanup, :before
-              b2.use StopInstance
+              b2.use action_halt
               b2.use DeleteVM
               b2.use SyncedFolderCleanup
             end
@@ -58,7 +58,11 @@ module VagrantPlugins
 
             b2.use Call, GracefulHalt, :off, :running do |env2, b3|
               if !env2[:result]
-                b3.use StopInstance
+                if env2[:force_halt]
+                  b3.use HaltInstance
+                else
+                  b3.use StopInstance
+                end
               end
             end
           end
@@ -302,6 +306,7 @@ module VagrantPlugins
       autoload :CheckAccess, action_root.join("check_access")
       autoload :Configure, action_root.join("configure")
       autoload :DeleteVM, action_root.join("delete_vm")
+      autoload :HaltInstance, action_root.join("halt_instance")
       autoload :Import, action_root.join("import")
       autoload :Package, action_root.join("package")
       autoload :IsWindows, action_root.join("is_windows")
