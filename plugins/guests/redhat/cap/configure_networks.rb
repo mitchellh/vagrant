@@ -48,6 +48,23 @@ module VagrantPlugins
               raise Vagrant::Errors::NetworkManagerNotInstalled, device: network[:device]
             end
 
+            # Render static route file if present
+            if network.key?(:route) && network[:route] != nil
+              routeentry = TemplateRenderer.render("guests/redhat/network_route",
+                routes: network[:route],
+              )
+              route_remote_path = "/tmp/vagrant-network-route-entry-#{network[:device]}-#{Time.now.to_i}-#{i}"
+              Tempfile.open("vagrant-redhat-configure-networks-routes") do |f|
+                f.binmode
+                f.write(routeentry)
+                f.fsync
+                f.close
+                machine.communicate.upload(f.path, route_remote_path)
+              end
+              route_final_path = "#{network_scripts_dir}/route-#{network[:device]}"
+              commands[:middle] << "mv -f '#{route_remote_path}' '#{route_final_path}'"
+            end
+
             # Render a new configuration
             entry = TemplateRenderer.render("guests/redhat/network_#{network[:type]}",
               options: extra_opts.merge(network),
