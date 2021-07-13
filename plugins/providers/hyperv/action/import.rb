@@ -5,7 +5,6 @@ module VagrantPlugins
   module HyperV
     module Action
       class Import
-
         VALID_HD_EXTENSIONS = [".vhd".freeze, ".vhdx".freeze].freeze
 
         def initialize(app, env)
@@ -42,33 +41,44 @@ module VagrantPlugins
             @logger.info("Found box configuration path: #{config_path}")
           end
 
+          # Fixes: 10831: This original logic with image_path does not work, if there is more than one disk (we cannot rely on the first disk
+          # indicating the destination directory, and any additional disks overwrite this)
+          # A better approach is passing the destination directory (instead of guessing it), to powershell
+          # and use the HyperV module to derive the needed paths from the VMConfig, which is used by the powershell
+          # code anyway to find the necessary drives.
           image_path = nil
+          source_disk_files = []
           hd_dir.each_child do |file|
             if VALID_HD_EXTENSIONS.include?(file.extname.downcase)
               image_path = file
-              break
+              # source_disk_files.push(Vagrant::Util::Platform.wsl_to_windows_path(file).gsub("/", "\\"))
+              source_disk_files.push(file.to_s)
+              @logger.info("Use original disk from box: #{file.to_s}")
             end
           end
 
           if !image_path
-            @logger.error("Failed to locate box image path")
+            @logger.error("Failed to locate any disks in this box.")
             raise Errors::BoxInvalid, name: env[:machine].name
           else
-            @logger.info("Found box image path: #{image_path}")
           end
 
           env[:ui].output("Importing a Hyper-V instance")
-          dest_path = env[:machine].data_dir.join("Virtual Hard Disks").join(image_path.basename).to_s
+          dest_dir = env[:machine].data_dir.join("Virtual Hard Disks").to_s
+          @logger.info("Putting all disk drives into  #{dest_dir}")
 
           options = {
             "VMConfigFile" => Vagrant::Util::Platform.wsl_to_windows_path(config_path).gsub("/", "\\"),
-            "DestinationPath" => Vagrant::Util::Platform.wsl_to_windows_path(dest_path).gsub("/", "\\"),
+            "DestinationDirectory" => Vagrant::Util::Platform.wsl_to_windows_path(dest_dir).gsub("/", "\\"),
             "DataPath" => Vagrant::Util::Platform.wsl_to_windows_path(env[:machine].data_dir).gsub("/", "\\"),
             "LinkedClone" => !!env[:machine].provider_config.linked_clone,
-            "SourcePath" => Vagrant::Util::Platform.wsl_to_windows_path(image_path).gsub("/", "\\"),
             "VMName" => env[:machine].provider_config.vmname,
+            # Catenate the values using a "|" character, withstood all attempts to use a standard representation of the array or JSON or similar
+            "SourceDiskFilesString" => source_disk_files.collect {
+              |item|
+              Vagrant::Util::Platform.wsl_to_windows_path(item).gsub("/", "\\")
+            }.join("|"),
           }
-
 
           env[:ui].detail("Creating and registering the VM...")
           server = env[:machine].provider.driver.import(options)

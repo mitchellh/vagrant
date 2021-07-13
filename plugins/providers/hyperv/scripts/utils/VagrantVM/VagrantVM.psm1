@@ -7,16 +7,16 @@ function New-VagrantVM {
     param (
         [parameter(Mandatory=$true)]
         [string] $VMConfigFile,
-        [parameter(Mandatory=$true)]
-        [string] $DestinationPath,
+        [parameter (Mandatory=$true)]
+        [string] $DestinationDirectory,
         [parameter (Mandatory=$true)]
         [string] $DataPath,
-        [parameter (Mandatory=$true)]
-        [string] $SourcePath,
         [parameter (Mandatory=$false)]
         [bool] $LinkedClone = $false,
         [parameter(Mandatory=$false)]
-        [string] $VMName
+        [string] $VMName,
+        [parameter (Mandatory=$false)]
+        $SourceFileHash = @{}
     )
     if([IO.Path]::GetExtension($VMConfigFile).ToLower() -eq ".xml") {
         return New-VagrantVMXML @PSBoundParameters
@@ -38,20 +38,20 @@ by cloning the original.
 .PARAMETER VMConfigFile
 Path to the original Hyper-V VM configuration file.
 
-.PARAMETER DestinationPath
-Path to new Hyper-V VM hard drive.
+.PARAMETER DestinationDirectory
+Path to the directory where new Hyper-V VM hard drives are created or linked as clones based on the XML or VMCX.
 
 .PARAMETER DataPath
 Directory path of the original Hyper-V VM to be cloned.
-
-.PARAMETER SourcePath
-Path to the original Hyper-V VM hard drive.
 
 .PARAMETER LinkedClone
 New Hyper-V VM should be linked clone instead of complete copy.
 
 .PARAMETER VMName
 Name of the new Hyper-V VM.
+
+.PARAMETER SourceFileHash
+The full paths to the attached disks from the box' download location, indexed by the file name of these disks.
 
 .INPUTS
 
@@ -68,15 +68,13 @@ function New-VagrantVMVMCX {
         [parameter(Mandatory=$true)]
         [string] $VMConfigFile,
         [parameter(Mandatory=$true)]
-        [string] $DestinationPath,
-        [parameter (Mandatory=$true)]
         [string] $DataPath,
-        [parameter (Mandatory=$true)]
-        [string] $SourcePath,
         [parameter (Mandatory=$false)]
         [bool] $LinkedClone = $false,
         [parameter(Mandatory=$false)]
-        [string] $VMName
+        [string] $VMName,
+        [parameter (Mandatory=$false)]
+        $SourceFileHash
     )
 
     $NewVMConfig = @{
@@ -89,7 +87,7 @@ function New-VagrantVMVMCX {
 
     # If the config is empty it means the import failed. Attempt to provide
     # context for failure
-    if($VMConfig -eq $null) {
+    if($null -eq $VMConfig) {
         Report-ErrorVagrantVMImport -VMConfigFile $VMConfigFile
     }
 
@@ -112,7 +110,7 @@ function New-VagrantVMVMCX {
     # Verify new VM
     $Report = Hyper-V\Compare-VM -CompatibilityReport $VMConfig
     if($Report.Incompatibilities.Length -gt 0){
-        throw $(ConvertTo-Json $($Report.Incompatibilities | Select -ExpandProperty Message))
+        throw $(ConvertTo-Json $($Report.Incompatibilities | Select-Object -ExpandProperty Message))
     }
 
     if($LinkedClone) {
@@ -122,16 +120,28 @@ function New-VagrantVMVMCX {
         }
         foreach($Controller in $Controllers) {
             foreach($Drive in $Controller.Drives) {
-                if([System.IO.Path]::GetFileName($Drive.Path) -eq [System.IO.Path]::GetFileName($SourcePath)) {
-                    $Path = $Drive.Path
+                $SourcePath = $Drive.pathname."#text"
+                $diskFileName = [System.IO.Path]::GetFileName($SourcePath)
+                $originalSourceFile = $SourceFileHash[$diskFileName.ToLower()]
+                if ($null -eq $originalSourceFile) {
+                    Write-Warning("One of the drives asks for a disk that doesn't exist in original box. Skipping {0}" -f $SourcePath)
+                    Write-Warning($SourceFileHash | ConvertTo-Json)
+                    continue;
+                }
+                $DestinationPath = [System.IO.Path]::Combine($DestinationDirectory, $diskFileName)
+
+                # The logic around the foreach only applies for linked clones, but this seems the correct logic for all cases
+                if ($LinkedClone) {
                     Hyper-V\Remove-VMHardDiskDrive $Drive
-                    Hyper-V\New-VHD -Path $DestinationPath -ParentPath $SourcePath -Differencing
+                    Hyper-V\New-VHD -Path $DestinationPath -ParentPath $originalSourceFile -Differencing -ErrorAction Stop
                     Hyper-V\Add-VMHardDiskDrive -VM $VM -Path $DestinationPath
-                    break
+                } else {
+                    Hyper-V\Remove-VMHardDiskDrive $Drive
+                    Copy-Item -Path $originalSourceFile -Destination $DestinationPath -ErrorAction Stop
+                    Hyper-V\Add-VMHardDiskDrive -VM $VM -Path $DestinationPath
                 }
             }
         }
-
     }
     return Hyper-V\Import-VM -CompatibilityReport $VMConfig
 <#
@@ -147,20 +157,20 @@ by cloning the original.
 .PARAMETER VMConfigFile
 Path to the original Hyper-V VM configuration file.
 
-.PARAMETER DestinationPath
-Path to new Hyper-V VM hard drive.
+.PARAMETER DestinationDirectory
+Path to the directory where new Hyper-V VM hard drives are created or linked as clones based on the XML or VMCX.
 
 .PARAMETER DataPath
 Directory path of the original Hyper-V VM to be cloned.
-
-.PARAMETER SourcePath
-Path to the original Hyper-V VM hard drive.
 
 .PARAMETER LinkedClone
 New Hyper-V VM should be linked clone instead of complete copy.
 
 .PARAMETER VMName
 Name of the new Hyper-V VM.
+
+.PARAMETER SourceFileHash
+The full paths to the attached disks from the box' download location, indexed by the file name of these disks.
 
 .INPUTS
 
@@ -176,26 +186,21 @@ function New-VagrantVMXML {
     param (
         [parameter(Mandatory=$true)]
         [string] $VMConfigFile,
-        [parameter(Mandatory=$true)]
-        [string] $DestinationPath,
+        [parameter (Mandatory=$true)]
+        [string] $DestinationDirectory,
         [parameter (Mandatory=$true)]
         [string] $DataPath,
-        [parameter (Mandatory=$true)]
-        [string] $SourcePath,
         [parameter (Mandatory=$false)]
         [bool] $LinkedClone = $false,
         [parameter(Mandatory=$false)]
-        [string] $VMName
+        [string] $VMName,
+        [parameter (Mandatory=$false)]
+        $SourceFileHash
+
     )
 
-    $DestinationDirectory = [System.IO.Path]::GetDirectoryName($DestinationPath)
     New-Item -ItemType Directory -Force -Path $DestinationDirectory
 
-    if($LinkedClone){
-        Hyper-V\New-VHD -Path $DestinationPath -ParentPath $SourcePath -ErrorAction Stop
-    } else {
-        Copy-Item $SourcePath -Destination $DestinationPath -ErrorAction Stop
-    }
 
     [xml]$VMConfig = Get-Content -Path $VMConfigFile
     $Gen = [int]($VMConfig.configuration.properties.subtype."#text") + 1
@@ -266,11 +271,23 @@ function New-VagrantVMXML {
         } else {
             $ControllerType = "IDE"
         }
-        $Drives = $Node.ChildNodes | where {$_.pathname."#text"}
+        $Drives = $Node.ChildNodes | Where-Object { $_.pathname."#text" }
         foreach($Drive in $Drives) {
             $DriveType = $Drive.type."#text"
             if($DriveType -ne "VHD") {
                 continue
+            }
+            $SourcePath = $Drive.pathname."#text"
+            $diskFileName = [System.IO.Path]::GetFileName($SourcePath)
+            $originalSourceFile = $SourceFileHash[$diskFileName.ToLower()]
+            if ($null -eq $originalSourceFile) {
+                Write-Warning("One of the drives asks for a disk that doesn't exist in original box. Skipping {0}" -f $diskFileName)
+            }
+            $DestinationPath = [System.IO.Path]::Combine($DestinationDirectory, $diskFileName)
+            if ($LinkedClone) {
+                Hyper-V\New-VHD -Path $DestinationPath -ParentPath $originalSourceFile -ErrorAction Stop
+            } else {
+                Copy-Item -Path $originalSourceFile -Destination $DestinationPath -ErrorAction Stop
             }
 
             $NewDriveConfig = @{
@@ -331,14 +348,11 @@ by cloning the original.
 .PARAMETER VMConfigFile
 Path to the original Hyper-V VM configuration file.
 
-.PARAMETER DestinationPath
-Path to new Hyper-V VM hard drive.
+.PARAMETER DestinationDirectory
+Path to the directory where new Hyper-V VM hard drives are created or linked as clones based on the XML or VMCX.
 
 .PARAMETER DataPath
 Directory path of the original Hyper-V VM to be cloned.
-
-.PARAMETER SourcePath
-Path to the original Hyper-V VM hard drive.
 
 .PARAMETER LinkedClone
 New Hyper-V VM should be linked clone instead of complete copy.
@@ -376,10 +390,10 @@ function Report-ErrorVagrantVMImport {
     if($Result.ReturnValue -eq 0) {
         throw "Unknown error encountered while importing VM"
     } elseif($Result.ReturnValue -eq 4096) {
-        $job = Get-WmiObject -Namespace 'root\virtualization\v2' -Query 'select * from Msvm_ConcreteJob' | Where {$_.__PATH -eq $Result.Job}
+        $job = Get-WmiObject -Namespace 'root\virtualization\v2' -Query 'select * from Msvm_ConcreteJob' | Where-Object { $_.__PATH -eq $Result.Job }
         while($job.JobState -eq 3 -or $job.JobState -eq 4) {
-            start-sleep 1
-            $job = Get-WmiObject -Namespace 'root\virtualization\v2' -Query 'select * from Msvm_ConcreteJob' | Where {$_.__PATH -eq $Result.Job}
+            Start-Sleep 1
+            $job = Get-WmiObject -Namespace 'root\virtualization\v2' -Query 'select * from Msvm_ConcreteJob' | Where-Object { $_.__PATH -eq $Result.Job }
         }
         $ErrorMsg = $job.ErrorDescription + "`n`n"
         $ErrorMsg = $ErrorMsg + "Error Code: " + $job.ErrorCode + "`n"
@@ -628,9 +642,9 @@ function Set-VagrantVMService {
     )
 
     if($Enable) {
-        Hyper-V\Get-VMIntegrationService -VM $VM | ?{$_.Id -match $Id} | Hyper-V\Enable-VMIntegrationService
+        Hyper-V\Get-VMIntegrationService -VM $VM | Where-Object { $_.Id -match $Id } | Hyper-V\Enable-VMIntegrationService
     } else {
-        Hyper-V\Get-VMIntegrationService -VM $VM | ?{$_.Id -match $Id} | Hyper-V\Disable-VMIntegrationService
+        Hyper-V\Get-VMIntegrationService -VM $VM | Where-Object { $_.Id -match $Id } | Hyper-V\Disable-VMIntegrationService
     }
     return $VM
 <#
@@ -728,8 +742,8 @@ function Check-VagrantHyperVAccess {
         [parameter (Mandatory=$true)]
         [string] $Path
     )
-    $acl = Get-ACL -Path $Path
-    $systemACL = $acl.Access | where {
+    $acl = Get-Acl -Path $Path
+    $systemACL = $acl.Access | Where-Object {
         try { return $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq "S-1-5-18" } catch { return $false } -and
         $_.FileSystemRights -eq "FullControl" -and
         $_.AccessControlType -eq "Allow" -and
