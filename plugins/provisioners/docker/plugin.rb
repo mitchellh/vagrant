@@ -39,6 +39,16 @@ module VagrantPlugins
         Cap::Centos::DockerStartService
       end
 
+      guest_capability("oraclelinux", "docker_install") do
+        require_relative "cap/oraclelinux/docker_install"
+        Cap::OracleLinux::DockerInstall
+      end
+
+      guest_capability("oraclelinux", "docker_start_service") do
+        require_relative "cap/oraclelinux/docker_start_service"
+        Cap::OracleLinux::DockerStartService
+      end
+
       guest_capability("linux", "docker_installed") do
         require_relative "cap/linux/docker_installed"
         Cap::Linux::DockerInstalled

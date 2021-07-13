@@ -70,6 +70,11 @@ module VagrantPlugins
         Cap::Guest::RedHat::AnsibleInstall
       end
 
+      guest_capability(:oraclelinux, :ansible_install) do
+        require_relative "cap/guest/oraclelinux/ansible_install"
+        Cap::Guest::OracleLinux::AnsibleInstall
+      end
+
       guest_capability(:suse, :ansible_install) do
         require_relative "cap/guest/suse/ansible_install"
         Cap::Guest::SUSE::AnsibleInstall

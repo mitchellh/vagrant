@@ -2990,6 +2990,8 @@ en:
           provisioner
         not_running: "Docker is not running on the guest VM."
         install_failed: "Docker installation failed."
+        not_supported: |-
+          Unfortunately Docker is not supported on the guest OS running in the machine.
 
       podman:
         wrong_provisioner: |-
