@@ -26,6 +26,16 @@ module VagrantPlugins
         Cap::Halt
       end
 
+      guest_capability(:openbsd, :choose_addressable_ip_addr) do
+        require_relative "cap/choose_addressable_ip_addr"
+        Cap::ChooseAddressableIPAddr
+      end
+
+      guest_capability(:openbsd, :mount_smb_shared_folder) do
+        require_relative "cap/mount_smb_shared_folder"
+        Cap::MountSMBSharedFolder
+      end
+
       guest_capability(:openbsd, :rsync_install) do
         require_relative "cap/rsync"
         Cap::RSync
