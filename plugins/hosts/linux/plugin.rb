@@ -62,6 +62,26 @@ module VagrantPlugins
         require_relative "cap/ssh"
         Cap::SSH
       end
+
+      host_capability("linux", "smb_installed") do
+        require_relative "cap/smb"
+        Cap::SMB
+      end
+
+      host_capability("linux", "smb_prepare") do
+        require_relative "cap/smb"
+        Cap::SMB
+      end
+
+      host_capability("linux", "smb_cleanup") do
+        require_relative "cap/smb"
+        Cap::SMB
+      end
+
+      host_capability("linux", "configured_ip_addresses") do
+        require_relative "cap/configured_ip_addresses"
+        Cap::ConfiguredIPAddresses
+      end
     end
   end
 end
