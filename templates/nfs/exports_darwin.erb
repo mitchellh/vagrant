@@ -1,7 +1,7 @@
 # VAGRANT-BEGIN: <%= user %> <%= uuid %>
 <% folders.each do |dirs, opts| %>
 <% dirs.each do |d| %>
-"<%= d %>" <%=opts[:bsd__compiled_nfs_options] %> <%= ips.join(" ") %>
+"<%= d.sub(%r{^/System/Volumes/Data}, "") %>" <%=opts[:bsd__compiled_nfs_options] %> <%= ips.join(" ") %>
 <% end %>
 <% end %>
 # VAGRANT-END: <%= user %> <%= uuid %>
