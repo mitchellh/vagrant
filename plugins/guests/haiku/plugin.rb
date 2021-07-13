@@ -21,6 +21,16 @@ module VagrantPlugins
         Cap::ChangeHostName
       end
 
+      guest_capability(:haiku, :network_interfaces) do
+        require_relative "cap/network_interfaces"
+        Cap::ConfigureNetworks
+      end
+
+      guest_capability(:haiku, :configure_networks) do
+        require_relative "cap/configure_networks"
+        Cap::ConfigureNetworks
+      end
+
       guest_capability(:haiku, :insert_public_key) do
         require_relative "cap/insert_public_key"
         Cap::InsertPublicKey

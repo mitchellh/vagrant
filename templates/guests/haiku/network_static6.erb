@@ -1,0 +1,6 @@
+interface <%= options[:device] %> {
+  address inet6 {
+    address <%= options[:ip] %>
+    mask <%= options[:netmask] %>
+  }
+}
