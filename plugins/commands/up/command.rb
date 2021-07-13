@@ -11,7 +11,7 @@ module VagrantPlugins
       include StartMixins
 
       def self.synopsis
-        "starts and provisions the vagrant environment"
+        "starts and provisions the vagrant environment or a single machine"
       end
 
       def execute
