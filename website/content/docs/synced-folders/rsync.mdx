@@ -94,12 +94,12 @@ end
 ## Rsync to a restricted folder
 
 If required to copy to a destination where `vagrant` user does not have
-permissions, use `"--rsync-path='sudo rsync'"` to run rsync with sudo on the guest
+permissions, use option `rsync__rsync_path` to run rsync with sudo on the guest
 
 ```ruby
 Vagrant.configure("2") do |config|
   config.vm.synced_folder "bin", "/usr/local/bin", type: "rsync",
     rsync__exclude: ".git/",
-    rsync__args: ["--verbose", "--rsync-path='sudo rsync'", "--archive", "--delete", "-z"]
+    rsync__rsync_path: "sudo rsync"
 end
 ```
