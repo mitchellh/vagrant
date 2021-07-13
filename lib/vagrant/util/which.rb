@@ -37,11 +37,13 @@ module Vagrant
           search_path = ENV['PATH']
         end
 
-        SilenceWarnings.silence! do
-          search_path.encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '').split(File::PATH_SEPARATOR).each do |path|
-            exts.each do |ext|
-              exe = "#{path}#{File::SEPARATOR}#{cmd}#{ext}"
-              return exe if File.executable? exe
+        if !search_path.nil?
+          SilenceWarnings.silence! do
+            search_path.encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '').split(File::PATH_SEPARATOR).each do |path|
+              exts.each do |ext|
+                exe = "#{path}#{File::SEPARATOR}#{cmd}#{ext}"
+                return exe if File.executable? exe
+              end
             end
           end
         end
