@@ -83,12 +83,16 @@ module VagrantPlugins
               host = "//" + host[0].downcase + host[2..-1]
               v = [host, guest].join(":")
             else
-              host, guest = v.split(":", 2)
-              host = Vagrant::Util::Platform.windows_path(host)
               # NOTE: Docker does not support UNC style paths (which also
               # means that there's no long path support). Hopefully this
               # will be fixed someday and the gsub below can be removed.
-              host.gsub!(/^[^A-Za-z]+/, "")
+              host, guest = v.split(":", 2)
+              # If using WSL within a drvfs file system
+              # we want to continue to use linux pathing
+              if (!ENV["VAGRANT_WSL_ENABLE_WINDOWS_ACCESS"])
+                host = Vagrant::Util::Platform.windows_path(host)
+                host.gsub!(/^[^A-Za-z]+/, "")
+              end
               v = [host, guest].join(":")
             end
           end
