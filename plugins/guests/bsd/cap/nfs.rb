@@ -9,8 +9,6 @@ module VagrantPlugins
 
         # Mount the given NFS folder.
         def self.mount_nfs_folder(machine, ip, folders)
-          comm = machine.communicate
-
           # Mount each folder separately so we can retry.
           folders.each do |name, opts|
             # Shellescape the paths in case they do not have special characters.

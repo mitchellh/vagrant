@@ -90,7 +90,12 @@ module Vagrant
           folders.each do |impl, impl_name, fs|
             if !env[:synced_folders_disable]
               @logger.info("Invoking synced folder enable: #{impl_name}")
-              impl.enable(env[:machine], fs, impl_opts(impl_name, env))
+              synced_folder_opts = impl_opts(impl_name, env)
+              # Add synced folder options to synced folder hash
+              fs.each do |_, v|
+                v.merge!(synced_folder_opts)
+              end
+              impl.enable(env[:machine], fs, synced_folder_opts)
               next
             end
 
