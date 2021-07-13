@@ -139,13 +139,19 @@ module Vagrant
           return @_windows_hyperv_enabled if defined?(@_windows_hyperv_enabled)
 
           @_windows_hyperv_enabled = -> {
-            ["Get-WindowsOptionalFeature", "Get-WindowsFeature"].each do |cmd_name|
-              ps_cmd = "$(#{cmd_name} -FeatureName Microsoft-Hyper-V-Hypervisor).State"
+            check_commands = Array.new.tap do |c|
+              c << "(Get-WindowsOptionalFeature -FeatureName Microsoft-Hyper-V-Hypervisor -Online).State"
+              c << "(Get-WindowsFeature -FeatureName Microsoft-Hyper-V-Hypervisor).State"
+            end
+            check_commands.each do |ps_cmd|
               begin
                 output = Vagrant::Util::PowerShell.execute_cmd(ps_cmd)
                 return true if output == "Enabled"
               rescue Errors::PowerShellInvalidVersion
                 logger.warn("Invalid PowerShell version detected during Hyper-V enable check")
+                return false
+              rescue Errors::PowerShellError
+                logger.warn("Powershell command not found or error on execution of command")
                 return false
               end
             end
