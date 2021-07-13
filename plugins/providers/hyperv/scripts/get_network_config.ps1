@@ -18,7 +18,7 @@ try {
     $netdev = Hyper-V\Get-VMNetworkAdapter -VM $vm | Select-Object -Index 0
     if ($netdev -ne $null) {
         if ($netdev.IpAddresses.Length -gt 0) {
-            foreach ($ip_address in $network.IpAddresses) {
+            foreach ($ip_address in $netdev.IpAddresses) {
                 if ($ip_address.Contains(".") -And [string]::IsNullOrEmpty($ip4_address)) {
                     $ip4_address = $ip_address
                 } elseif ($ip_address.Contains(":") -And [string]::IsNullOrEmpty($ip6_address)) {
