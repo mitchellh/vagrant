@@ -37,8 +37,8 @@ module VagrantPlugins
         #
         # The ! indicates that this method modifies its argument.
         def add_ips_to_env!(env)
-          adapter, host_ip = find_host_only_adapter
-          machine_ip       = read_static_machine_ips
+          adapter, host_ip, is_ipv6 = find_host_only_adapter
+          machine_ip                = read_static_machine_ips
 
           if !machine_ip
             # No static IP, attempt to use the dynamic IP.
@@ -62,9 +62,17 @@ module VagrantPlugins
 
           if host_ip && !machine_ip.empty?
             interface = @machine.provider.driver.read_host_only_interfaces.detect do |iface|
-              iface[:ip] == host_ip
+              if is_ipv6
+                iface[:ipv6] == host_ip
+              else
+                iface[:ip] == host_ip
+              end
             end
-            host_ipaddr = IPAddr.new("#{host_ip}/#{interface.fetch(:netmask, "0.0.0.0")}")
+            if is_ipv6
+              host_ipaddr = IPAddr.new("#{host_ip}/#{interface.fetch(:ipv6_prefix, "64")}")
+            else
+              host_ipaddr = IPAddr.new("#{host_ip}/#{interface.fetch(:netmask, "0.0.0.0")}")
+            end
 
             case machine_ip
             when String
@@ -92,7 +100,11 @@ module VagrantPlugins
             if opts[:type] == :hostonly
               @machine.provider.driver.read_host_only_interfaces.each do |interface|
                 if interface[:name] == opts[:hostonly]
-                  return adapter, interface[:ip]
+                  if interface[:ipv6]
+                    return adapter, interface[:ipv6], true
+                  else
+                    return adapter, interface[:ip], false
+                  end
                 end
               end
             end

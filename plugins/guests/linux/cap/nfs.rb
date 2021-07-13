@@ -1,3 +1,4 @@
+require "ipaddr"
 require_relative "../../../synced_folders/unix_mount_helpers"
 
 module VagrantPlugins
@@ -30,7 +31,13 @@ module VagrantPlugins
 
             machine.communicate.sudo("mkdir -p #{guest_path}")
 
-            command = "mount -o #{mount_opts} #{ip}:#{host_path} #{guest_path}"
+            addr = IPAddr.new(ip)
+
+            if addr.ipv6?
+              command = "mount -o #{mount_opts} [#{ip}]:#{host_path} #{guest_path}"
+            else
+              command = "mount -o #{mount_opts} #{ip}:#{host_path} #{guest_path}"
+            end
 
             # Run the command, raising a specific error.
             retryable(on: Vagrant::Errors::NFSMountFailed, tries: 3, sleep: 5) do

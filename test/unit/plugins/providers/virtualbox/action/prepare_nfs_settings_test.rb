@@ -54,6 +54,10 @@ describe VagrantPlugins::ProviderVirtualBox::Action::PrepareNFSSettings do
       [{name: "vmnet2", ip: "1.2.3.4"}]
     }
 
+    let(:guest_ip) {
+      "2.3.4.5"
+    }
+
     before do
       # We can't be on Windows, because NFS gets disabled on Windows
       allow(Vagrant::Util::Platform).to receive(:windows?).and_return(false)
@@ -66,11 +70,28 @@ describe VagrantPlugins::ProviderVirtualBox::Action::PrepareNFSSettings do
         2 => {type: :hostonly, hostonly: "vmnet2"},
       })
       allow(driver).to receive(:read_host_only_interfaces).and_return(host_only_interfaces)
-      allow(driver).to receive(:read_guest_ip).with(1).and_return("2.3.4.5")
+      allow(driver).to receive(:read_guest_ip).with(1).and_return(guest_ip)
 
       # override sleep to 0 so test does not take seconds
       retry_options = subject.retry_options
       allow(subject).to receive(:retry_options).and_return(retry_options.merge(sleep: 0))
+    end
+
+    context "with ipv6 addresses" do
+      let(:host_only_interfaces) {
+        [{name: "vmnet2", ipv6: "fd63:acd4:5c42:0530::1"}]
+      }
+
+      let(:guest_ip) {
+        "fd63:acd4:5c42:0530::2"
+      }
+
+      it "sets nfs_host_ip and nfs_machine_ip properly" do
+        subject.call(env)
+
+        expect(env[:nfs_host_ip]).to eq("fd63:acd4:5c42:0530::1")
+        expect(env[:nfs_machine_ip]).to eq("fd63:acd4:5c42:0530::2")
+      end
     end
 
     context "with host interface netmask defined" do

@@ -32,6 +32,24 @@ describe "VagrantPlugins::GuestLinux::Cap::MountNFS" do
       )
     end
 
+    context "with ipv6" do
+      let(:ip) { "fd63:acd4:5c42:0530::1" }
+
+      it "mounts the folder" do
+        folders = {
+          "/vagrant-nfs" => {
+            type: :nfs,
+            guestpath: "/guest",
+            hostpath: "/host",
+          }
+        }
+        cap.mount_nfs_folder(machine, ip, folders)
+
+        expect(comm.received_commands[0]).to match(/mkdir -p #{guestpath}/)
+        expect(comm.received_commands[1]).to match(/\[fd63:acd4:5c42:0530::1\]:#{hostpath} #{guestpath}/)
+      end
+    end
+
     it "mounts the folder" do
       folders = {
         "/vagrant-nfs" => {
