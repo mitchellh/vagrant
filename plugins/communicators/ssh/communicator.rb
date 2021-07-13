@@ -40,7 +40,8 @@ module VagrantPlugins
         Errno::EHOSTUNREACH,
         Errno::EPIPE,
         Net::SSH::Disconnect,
-        Timeout::Error
+        Timeout::Error,
+        Net::SSH::Exception
       ]
 
       include Vagrant::Util::ANSIEscapeCodeRemover
@@ -84,7 +85,7 @@ module VagrantPlugins
             message  = nil
             begin
               begin
-                connect(retries: 1)
+                connect
                 return true if ready?
               rescue Vagrant::Errors::VagrantError => e
                 @logger.info("SSH not ready: #{e.inspect}")
@@ -429,7 +430,7 @@ module VagrantPlugins
           timeout = 60
 
           @logger.info("Attempting SSH connection...")
-          connection = retryable(tries: opts[:retries], on: SSH_RETRY_EXCEPTIONS) do
+          connection = retryable(tries: opts[:retries], on: SSH_RETRY_EXCEPTIONS, sleep: 5) do
             Timeout.timeout(timeout) do
               begin
                 # This logger will get the Net-SSH log data for us.
@@ -514,6 +515,9 @@ module VagrantPlugins
           # is used. Show a nicer error.
           raise Vagrant::Errors::SSHKeyTypeNotSupported
         end
+
+        @logger.debug("Resetting retries counter")
+        opts.delete(:retries) if opts.key?(:retries)
 
         @connection          = connection
         @connection_ssh_info = ssh_info
