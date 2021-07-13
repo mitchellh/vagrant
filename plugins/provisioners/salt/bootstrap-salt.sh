@@ -17,6 +17,8 @@ else
 fi
 
 if [ -e bootstrap-salt.sh ]; then
+  # Until Bootstrap's next official release that includes the fix, remove deprecated package source
+  sed -i 's/python2-futures //g' bootstrap-salt.sh
   sh bootstrap-salt.sh "$@"
 else
   exit 1
