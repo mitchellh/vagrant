@@ -200,6 +200,7 @@ module Vagrant
             self.each do |other|
               if entry.name == other.name &&
                 entry.provider == other.provider &&
+                entry.local_data_path.to_s == other.local_data_path.to_s &&
                 entry.vagrantfile_path.to_s == other.vagrantfile_path.to_s
                 id = other.id
                 break
