@@ -13,7 +13,11 @@ module VagrantPlugins
           machine.communicate.tap do |comm|
             # rsync does not construct any gaps in the path to the target directory
             # make sure that all subdirectories are created
-            comm.execute("mkdir -p '#{opts[:guestpath]}'")
+            # NB: Per #11878, the `mkdir` command on Windows is different than used on Unix.
+            # This formulation matches the form used in the WinRM communicator plugin.
+            # This will ignore any -p switches, which are redundant in PowerShell,
+            # and ambiguous in PowerShell 4+
+            comm.execute("mkdir \"#{opts[:guestpath]}\" -force")
           end
         end
       end
