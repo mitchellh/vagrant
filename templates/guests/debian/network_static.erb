@@ -7,4 +7,9 @@ iface <%= options[:device] %> inet static
 <% if options[:gateway] %>
       gateway <%= options[:gateway] %>
 <% end %>
+<% if options[:route] %>
+<% options[:route].split(';').each do |route| %>
+      post-up ip -4 route add <%= route %>
+<% end %>
+<% end %>
 #VAGRANT-END
