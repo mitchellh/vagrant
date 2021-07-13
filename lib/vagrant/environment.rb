@@ -1033,7 +1033,7 @@ module Vagrant
     # doesn't already exist.
     #
     # This must be done because `ssh` requires that the key is chmod
-    # 0600, but if Vagrant is installed as a separate user, then the
+    # 0600 or more, but if Vagrant is installed as a separate user, then the
     # effective uid won't be able to read the key. So the key is copied
     # to the home directory and chmod 0600.
     def copy_insecure_private_key
@@ -1055,7 +1055,7 @@ module Vagrant
       if !Util::Platform.windows?
         # On Windows, permissions don't matter as much, so don't worry
         # about doing chmod.
-        if Util::FileMode.from_octal(@default_private_key_path.stat.mode) != "600"
+        if Util::FileMode.from_octal(@default_private_key_path.stat.mode) < "600"
           @logger.info("Changing permissions on private key to 0600")
           @default_private_key_path.chmod(0600)
         end

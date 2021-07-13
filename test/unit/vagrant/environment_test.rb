@@ -1153,7 +1153,7 @@ VF
       expect(pk).to be_exist
 
       if !Vagrant::Util::Platform.windows?
-        expect(Vagrant::Util::FileMode.from_octal(pk.stat.mode)).to eq("600")
+        expect(Vagrant::Util::FileMode.from_octal(pk.stat.mode)).to be >= "600"
       end
     end
   end
