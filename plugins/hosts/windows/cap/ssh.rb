@@ -10,7 +10,7 @@ module VagrantPlugins
         def self.set_ssh_key_permissions(env, key_path)
           script_path = Host.scripts_path.join("set_ssh_key_permissions.ps1")
           result = Vagrant::Util::PowerShell.execute(
-            script_path.to_s, "-KeyPath", key_path.to_s,
+            script_path.to_s, "-KeyPath", key_path.to_s.gsub(' ', '` '),
             module_path: Host.modules_path.to_s
           )
           if result.exit_code != 0
